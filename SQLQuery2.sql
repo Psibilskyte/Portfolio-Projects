@@ -1,0 +1,218 @@
+Select*
+From portfolio.dbo.HOUSING
+
+-- CHANGING SALE DATE
+
+Select SaleDateConverted, CONVERT(date,SaleDate)
+From portfolio.dbo.HOUSING
+
+UPDATE HOUSING
+SET SaleDate = CONVERT(date,SaleDate)
+
+ALTER TABLE HOUSING
+Add SaleDateConverted Date;
+
+Update HOUSING
+SET SaleDateConverted = CONVERT(date,SaleDate)
+
+-- POPULATE PROPERTY ADDRESS DATA
+
+Select PropertyAddress
+From portfolio.dbo.HOUSING
+
+Select PropertyAddress
+From portfolio.dbo.HOUSING
+Where PropertyAddress is null
+
+Select *
+From portfolio.dbo.HOUSING
+Where PropertyAddress is null
+
+-- SELFJOIN (Joining same rows with same parcel id property address but different Unique ID )
+
+Select a.ParcelID, a.PropertyAddress, b.ParcelID, b.PropertyAddress, ISNULL(a.PropertyAddress, b.PropertyAddress)
+From portfolio.dbo.HOUSING a
+JOIN portfolio.dbo.HOUSING b
+on a.ParcelID = b.ParcelID
+and a.UniqueID <> b.UniqueID
+Where a.PropertyAddress is NULL
+
+Update a
+SET PropertyAddress = ISNULL(a.PropertyAddress, b.PropertyAddress)
+From portfolio.dbo.HOUSING a
+JOIN portfolio.dbo.HOUSING b
+on a.ParcelID = b.ParcelID
+and a.UniqueID <> b.UniqueID
+Where a.PropertyAddress is NULL
+
+
+
+-- Breaking out address into individual columns 
+
+-- Looking at property addresses
+
+Select PropertyAddress
+From portfolio.dbo.HOUSING
+
+-- Seperating Street name and City:
+
+--STREET NAME:
+
+SELECT
+SUBSTRING(PropertyAddress, 1,CHARINDEX(',', PropertyAddress)) as Address
+
+From portfolio.dbo.HOUSING
+
+--Removing comma from street name
+
+SELECT
+SUBSTRING(PropertyAddress, 1,CHARINDEX(',', PropertyAddress)-1) as Address
+
+From portfolio.dbo.HOUSING
+
+-- ADDING CITY
+
+SELECT
+SUBSTRING(PropertyAddress, 1,CHARINDEX(',', PropertyAddress)-1) as Address
+, SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) +1, LEN(PropertyAddress)) as Address
+
+From portfolio.dbo.HOUSING
+
+-- Creating new columns for main table for street name and city
+
+ALTER TABLE HOUSING
+Add PropertySplitAddress Nvarchar(255);
+
+Update HOUSING
+Set PropertySplitAddress = SUBSTRING(PropertyAddress, 1,CHARINDEX(',', PropertyAddress)-1)
+
+ALTER TABLE HOUSING
+Add PropertySplitCity Nvarchar(255);
+
+Update HOUSING
+Set PropertySplitCity = SUBSTRING(PropertyAddress, CHARINDEX(',', PropertyAddress) +1, LEN(PropertyAddress))
+
+Select *
+From portfolio.dbo.HOUSING
+
+
+-- Looking at owner address
+
+Select OwnerAddress
+From portfolio.dbo.HOUSING
+
+
+-- Seperating Owner Address
+
+Select
+PARSENAME(REPLACE(OwnerAddress, ',', '.') , 3)
+, PARSENAME(REPLACE(OwnerAddress, ',', '.') , 2)
+, PARSENAME(REPLACE(OwnerAddress, ',', '.') , 1)
+From portfolio.dbo.HOUSING
+
+-- ADDING TO MAIN TABLE
+
+ALTER TABLE HOUSING
+Add OwnerSplitAddress Nvarchar(255);
+
+Update HOUSING
+Set OwnerSplitAddress = PARSENAME(REPLACE(OwnerAddress, ',', '.') , 3)
+
+ALTER TABLE HOUSING
+Add OwnerSplitCity Nvarchar(255);
+
+Update HOUSING
+Set OwnerSplitCity = PARSENAME(REPLACE(OwnerAddress, ',', '.') , 2)
+
+ALTER TABLE HOUSING
+Add OwnerSplitState Nvarchar(255);
+
+Update HOUSING
+Set OwnerSplitState = PARSENAME(REPLACE(OwnerAddress, ',', '.') , 1)
+
+-- CHANGING Y AND N to Yes and No in - Sold as Vacant - field
+
+-- Looking at Sold as Vacant field.
+
+Select Distinct(SoldAsVacant)
+From portfolio.dbo.HOUSING
+
+-- Couting the answers
+
+Select Distinct(SoldAsVacant), COUNT(SoldAsVacant)
+From portfolio.dbo.HOUSING
+Group by SoldAsVacant
+Order by 2
+
+-- CHANGING N to NO, Y to YES
+
+Select SoldAsVacant
+, CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+  WHEN SoldAsVacant = 'N' THEN 'No'
+  ELSE SoldAsVacant
+  END
+From portfolio.dbo.HOUSING
+
+-- UPDATING MAIN TABLE
+
+UPDATE HOUSING
+SET SoldAsVacant = CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+  WHEN SoldAsVacant = 'N' THEN 'No'
+  ELSE SoldAsVacant
+  END
+  From portfolio.dbo.HOUSING
+
+  -- REMOVING DUPLICATES
+
+  -- FINGING DUPLICATES
+
+  WITH RowNumbCTE AS(
+  Select * ,
+  ROW_NUMBER() OVER (
+  PARTITION BY ParcelID,
+               PropertyAddress,
+			   SalePrice,
+			   SaleDate,
+			   LegalReference
+			   ORDER BY
+			     UniqueID
+				 ) row_num
+From portfolio.dbo.HOUSING
+)
+Select *
+From RowNumbCTE
+Where row_num > 1
+Order by PropertyAddress
+
+
+-- DELETING DUPLICATES
+
+  WITH RowNumbCTE AS(
+  Select * ,
+  ROW_NUMBER() OVER (
+  PARTITION BY ParcelID,
+               PropertyAddress,
+			   SalePrice,
+			   SaleDate,
+			   LegalReference
+			   ORDER BY
+			     UniqueID
+				 ) row_num
+From portfolio.dbo.HOUSING
+)
+DELETE
+From RowNumbCTE
+Where row_num > 1
+
+
+
+-- DELETING UNUSED COLUMNS
+
+ALTER TABLE portfolio.dbo.HOUSING
+DROP COLUMN OwnerAddress, TaxDistrict, PropertyAddress
+
+ALTER TABLE portfolio.dbo.HOUSING
+DROP COLUMN SaleDate
+
+Select*
+From portfolio.dbo.HOUSING
